@@ -17,7 +17,7 @@ public class TestService {
     private RestTemplate restTemplate;
 
     public ResponseEntity<String> testHttps() {
-        ResponseEntity<String> responseEntity = null;
+          ResponseEntity<String> responseEntity = null;
         try {
             responseEntity = restTemplate.getForEntity("https://localhost:443/test-https-get", String.class);
             System.out.println("Result is : " +

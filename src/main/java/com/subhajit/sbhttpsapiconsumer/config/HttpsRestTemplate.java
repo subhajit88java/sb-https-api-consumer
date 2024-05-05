@@ -23,17 +23,23 @@ import java.security.cert.X509Certificate;
 @Configuration
 public class HttpsRestTemplate {
 
-    @Value("${key.truststore}")
-    private Resource truststoreCert;
+    @Value("${client.truststore}")
+    private Resource clientTruststore;
 
-    @Value("${key.truststore.password}")
-    private String truststoreCertPassword;
+    @Value("${client.truststore.password}")
+    private String clientTruststorePassword;
+
+    @Value("${client.keystore}")
+    private Resource clientKeystore;
+
+    @Value("${client.keystore.password}")
+    private String clientKeystorePassword;
 
     @Bean(name="restTemplateHttps")
     public RestTemplate restTemplate() {
 
         HttpClient httpClient = HttpClients.custom()
-                .setSSLSocketFactory(getSSLConnectionSocketFactory(truststoreCert,truststoreCertPassword ))
+                .setSSLSocketFactory(get2WaySSLConnectionSocketFactory2(clientTruststore,clientTruststorePassword,clientKeystore , clientKeystorePassword))
                 .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
                 .build();
 
@@ -52,7 +58,8 @@ public class HttpsRestTemplate {
             FileInputStream fileInputStream = new FileInputStream(truststoreCert.getFile());
             keyStore.load(fileInputStream, truststoreCertPassword.toCharArray());
 
-            SSLContext sslContext = new SSLContextBuilder()
+            // Implementing SSLContext with user-defined TrustStrategy, here we can write our own validation logic
+           /* SSLContext sslContext = new SSLContextBuilder()
                     .loadTrustMaterial(keyStore, new TrustStrategy() {
                         @Override
                         public boolean isTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
@@ -63,11 +70,38 @@ public class HttpsRestTemplate {
                         }
                     })
                     //.loadKeyMaterial(keyStore, truststoreCertPassword.toCharArray()) // no need
+                    .build();*/
+
+            // Implementing SSLContext with user-defined TrustSelfSignedStrategy, self signed + CA signed certs will be trusted here
+            SSLContext sslContext = new SSLContextBuilder()
+                    .loadTrustMaterial(keyStore, new TrustSelfSignedStrategy())
                     .build();
 
             return new SSLConnectionSocketFactory(sslContext);
 
         }catch (KeyStoreException | IOException | CertificateException | NoSuchAlgorithmException  | KeyManagementException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private SSLConnectionSocketFactory get2WaySSLConnectionSocketFactory2(Resource clientTruststore, String clientTruststorePassword, Resource clientKeystore, String clientKeystorePassword){
+        try{
+            KeyStore truststore = KeyStore.getInstance(KeyStore.getDefaultType());
+            FileInputStream fileInputStreamTrust = new FileInputStream(clientTruststore.getFile());
+            truststore.load(fileInputStreamTrust, clientTruststorePassword.toCharArray()); // This password is jks file password
+
+            KeyStore keystore = KeyStore.getInstance(KeyStore.getDefaultType());
+            FileInputStream fileInputStreamKey = new FileInputStream(clientKeystore.getFile());
+            keystore.load(fileInputStreamKey, clientKeystorePassword.toCharArray()); // This password is jks file password
+
+            SSLContext sslContext = new SSLContextBuilder()
+                    .loadTrustMaterial(truststore, new TrustSelfSignedStrategy())
+                    .loadKeyMaterial(keystore, "client_p12".toCharArray()) // used for 2 way SSl, need to send this keystore so that server can validate client. This password is the p12/privatekey entry password
+                    .build();
+
+            return new SSLConnectionSocketFactory(sslContext);
+
+        }catch (KeyStoreException | IOException | CertificateException | NoSuchAlgorithmException  | KeyManagementException | UnrecoverableKeyException e) {
             throw new RuntimeException(e);
         }
     }
