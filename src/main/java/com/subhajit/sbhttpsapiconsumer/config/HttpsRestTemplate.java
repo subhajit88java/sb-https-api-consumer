@@ -13,6 +13,8 @@ import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -39,8 +41,9 @@ public class HttpsRestTemplate {
     public RestTemplate restTemplate() {
 
         HttpClient httpClient = HttpClients.custom()
-                .setSSLSocketFactory(get2WaySSLConnectionSocketFactory2(clientTruststore,clientTruststorePassword,clientKeystore , clientKeystorePassword))
-                .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+                .setSSLSocketFactory(getSSLConnectionSocketFactory(clientTruststore,clientTruststorePassword))
+                //.setSSLSocketFactory(get2WaySSLConnectionSocketFactory2(clientTruststore,clientTruststorePassword,clientKeystore , clientKeystorePassword))
+                //.setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
                 .build();
 
         HttpComponentsClientHttpRequestFactory factory = new HttpComponentsClientHttpRequestFactory();
@@ -58,24 +61,49 @@ public class HttpsRestTemplate {
             FileInputStream fileInputStream = new FileInputStream(truststoreCert.getFile());
             keyStore.load(fileInputStream, truststoreCertPassword.toCharArray());
 
-            // Implementing SSLContext with user-defined TrustStrategy, here we can write our own validation logic
-           /* SSLContext sslContext = new SSLContextBuilder()
-                    .loadTrustMaterial(keyStore, new TrustStrategy() {
+            // TrustSelfSignedStrategy implemented, means any server cert which self signed or containing just 1 entry will be trusted. No cert check will be done with client-truststore as reference
+            // Also with X509TrustManagerImpl implemented here, no cert expiration check will be performed for self-signed certs only, though more research needed on this statement
+            // Even if we dont pass any truststore cert in the 1st param the server cert will be trusted because TrustSelfSignedStrategy is implemented
+
+            // TrustAllStrategy implemented, any self signed cert or CA signed cert chain will be trusted
+            // rest all features same as TrustSelfSignedStrategy
+
+            // If we customize TrustStrategy interface and override isTrusted() then,
+            // If return  = true, no cert validation will be performed on client side. Any server cert will be trusted
+            // If return  = false, second level of validation will be performed by X509TrustManagerImpl's  checkServerTrusted(). Under X509TrustManagerImpl validation, server-cert validation will be done with client-truststore cert and also expiry date validation
+            // Throw exeption, we can write customized validation logic here and throw exception so that X509TrustManagerImpl's  checkServerTrusted() is not called.
+            // NB : returning false from isTrusted() method and not using any TrustStrategy as 2nd param are equivalent. Both with delegate the flow to X509TrustManagerImpl's  checkServerTrusted() to perform 2nd level of validations
+            SSLContext sslContext = new SSLContextBuilder()
+                    .loadTrustMaterial(keyStore, new TrustStrategy(){
                         @Override
                         public boolean isTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
-                            for (X509Certificate cert: x509Certificates) {
-                                System.err.println("See -----------> " + cert);
-                            }
-                            return true;
+                              return false;
                         }
                     })
-                    //.loadKeyMaterial(keyStore, truststoreCertPassword.toCharArray()) // no need
-                    .build();*/
-
-            // Implementing SSLContext with user-defined TrustSelfSignedStrategy, self signed + CA signed certs will be trusted here
-            SSLContext sslContext = new SSLContextBuilder()
-                    .loadTrustMaterial(keyStore, new TrustSelfSignedStrategy())
                     .build();
+
+            // We can create our customized trust-manager so avoid execution of X509TrustManagerImpl
+
+//            X509TrustManager wrapper = new X509TrustManager() {
+//
+//                @Override
+//                public void checkClientTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
+//                    System.out.println("checkClientTrusted");
+//                }
+//
+//                @Override
+//                public void checkServerTrusted(X509Certificate[] x509Certificates, String s) throws CertificateException {
+//                    System.out.println("checkServerTrusted");
+//                }
+//
+//                @Override
+//                public X509Certificate[] getAcceptedIssuers() {
+//                    System.out.println("getAcceptedIssuers");
+//                    return new X509Certificate[0];
+//                }
+//            };
+
+           // sslContext.init(null, new TrustManager[]{wrapper}, null);
 
             return new SSLConnectionSocketFactory(sslContext);
 

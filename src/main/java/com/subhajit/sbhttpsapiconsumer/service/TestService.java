@@ -19,6 +19,7 @@ public class TestService {
     public ResponseEntity<String> testHttps() {
           ResponseEntity<String> responseEntity = null;
         try {
+            System.out.println("HTTPS call .....................");
             responseEntity = restTemplate.getForEntity("https://localhost:443/test-https-get", String.class);
             System.out.println("Result is : " +
                     responseEntity.getStatusCodeValue() + " - " + responseEntity.getStatusCode()
@@ -37,6 +38,7 @@ public class TestService {
             System.out.println("Exception is : " +
                     e.getMessage());
             responseEntity = new ResponseEntity<>(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            e.printStackTrace();
         }
         return responseEntity;
     }
