@@ -1,0 +1,75 @@
+Self-signed certs :
+CREATE CSR -
+openssl req -newkey rsa:2048 -nodes -subj '/C=IN/ST=WB/L=Durgapur/O=localhost/OU=localhost/CN=localhost' -keyout localhost.key -out localhost.csr
+
+SELF SIGN - 
+openssl x509 -in localhost.csr -out localhost.crt -req -signkey localhost.key -days 1
+
+CRAETE p12 - 
+openssl pkcs12 -export -in localhost.crt -inkey localhost.key -name localhost_server -out localhost.p12 -passout pass:123456
+
+CREATE SERVER JKS - 
+keytool -importkeystore -srckeystore localhost.p12 -srcstoretype pkcs12 -destkeystore server.jks -srcstorepass 123456 -deststoretype jks -deststorepass 123456
+
+CREATE CLIENT JKS - 
+keytool -import -trustcacerts -alias localhost_client -file localhost.crt -keystore client.jks
+================================================================================================================
+Root signed certs :
+CREATE ROOT CSR -
+openssl req -newkey rsa:2048 -nodes -subj '/C=IN/ST=WB/L=Durgapur/O=root/OU=root/CN=root' -keyout root.key -out root.csr
+
+SELF SIGN ROOT - 
+openssl x509 -in root.csr -out root.crt -req -signkey root.key -days 2
+
+CREATE SERVER CSR -
+openssl req -newkey rsa:2048 -nodes -subj '/C=IN/ST=WB/L=Kolkata/O=server/OU=server/CN=server' -keyout server.key -out server.csr
+
+ROOT SIGNED SERVER CERT -
+openssl x509 -req -CA root.crt -CAkey root.key -in server.csr -out server.crt -days 1 -CAcreateserial -extfile server.txt
+
+<merge root and server cert>
+
+CRAETE p12 - 
+openssl pkcs12 -export -in server.crt -inkey server.key -name server_cert -out server.p12 -passout pass:123456
+
+CREATE SERVER JKS - 
+keytool -importkeystore -srckeystore server.p12 -srcstoretype pkcs12 -destkeystore server.jks -srcstorepass 123456 -deststoretype jks -deststorepass 123456
+
+CREATE CLIENT JKS - 
+keytool -import -trustcacerts -alias root_cert -file root.crt -keystore client.jks
+================================================================================================================
+Root-intermediate signed certs :
+
+CREATE ROOT CSR -
+openssl req -newkey rsa:2048 -nodes -subj '/C=IN/ST=WB/L=Durgapur/O=root/OU=root/CN=root' -keyout root.key -out root.csr
+
+SELF SIGN ROOT - 
+openssl x509 -in root.csr -out root.crt -req -signkey root.key -days 3
+
+CREATE INTERMEDIATE CSR -
+openssl req -newkey rsa:2048 -nodes -subj '/C=IN/ST=MH/L=mumbai/O=intermediate/OU=intermediate/CN=intermediate' -keyout intermediate.key -out intermediate.csr
+
+ROOT SIGNED INTERMEDIATE CERT -
+openssl x509 -req -CA root.crt -CAkey root.key -in intermediate.csr -out intermediate.crt -days 2 -CAcreateserial
+
+CREATE SERVER CSR -
+openssl req -newkey rsa:2048 -nodes -subj '/C=IN/ST=WB/L=Kolkata/O=server/OU=server/CN=server' -keyout server.key -out server.csr
+
+INTERMEDIATE SIGNED SERVER CERT -
+openssl x509 -req -CA intermediate.crt -CAkey intermediate.key -in server.csr -out server.crt -days 1 -CAcreateserial -extfile server.txt
+
+<merge root + intermediate + server cert>
+
+CRAETE p12 - 
+openssl pkcs12 -export -in server.crt -inkey server.key -name server_cert -out server.p12 -passout pass:123456
+
+CREATE SERVER JKS - 
+keytool -importkeystore -srckeystore server.p12 -srcstoretype pkcs12 -destkeystore server.jks -srcstorepass 123456 -deststoretype jks -deststorepass 123456
+
+CREATE CLIENT JKS - 
+keytool -import -trustcacerts -alias root_cert -file root.crt -keystore client.jks
+===============================================================================================================
+
+keytool -v -list -keystore server.jks
+keytool -v -list -keystore client.jks
+===============================================================================================================

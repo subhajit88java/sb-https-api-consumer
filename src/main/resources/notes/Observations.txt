@@ -1,0 +1,12 @@
+1. TrustStrategy
+2. TrustManager
+
+loadTrustMaterial(cert, trust-strategy) >
+TrustStrategy is having isTrusted(), overriding that method we can write our own trust logic.
+if isTrusted() returns true , only  getAcceptedIssuers() of X509TrustManagerImpl gets called
+if isTrusted() returns false, checkServerTrusted()[calls checkTrusted with last param i.e checkClientTrusted as false  and getAcceptedIssuers() of X509TrustManagerImpl gets called
+if isTrusted() throws exception, will never land into X509TrustManagerImpl
+
+loadTrustMaterial(cert) >
+
+only  checkServerTrusted()[calls checkTrusted with last param i.e checkClientTrusted as false of X509TrustManagerImpl gets called

@@ -1,0 +1,65 @@
+# With TrustSelfSignedStrategy
+
+1. Self signed cert with server.com as common name. Client and server both running on localhost
+SSL handshake fails.
+Error message :
+I/O error on GET request for "https://localhost:443/test-https-get": Certificate for doesn't match any of the subject alternative names: []; nested exception is javax.net.ssl.SSLPeerUnverifiedException: Certificate for doesn't match any of the subject alternative names: []
+Resolution : 
+Put localhost either as Common name or as one of SAN in the self-signed certificate
+
+2. A copy of self signed cert as server cert and another copy of self signed cert  as client cert, both having same info and common name as localhost
+SSL handshake passes
+Predictive reason : TrustSelfSignedStrategy implemented, means any server cert which self signed will be trusted. No cert check will be done with client-truststore as reference
+
+3. A copy of self signed cert as server cert and another copy of self signed cert  as client cert, server cert having localhost as CN and client cert having client.com as CN, rest all info same
+SSL handshake passes
+Predictive reason : TrustSelfSignedStrategy implemented, means any server cert which self signed will be trusted. No cert check will be done with client-truststore as reference
+
+4. A copy of self signed cert as server cert and another copy of self signed cert  as client cert, server cert having localhost as CN and client cert having client.com as CN, rest all info same
+SSL handshake passes
+Predictive reason : TrustSelfSignedStrategy implemented, means any server cert which self signed will be trusted. No cert check will be done with client-truststore as reference
+
+5. A copy of self signed cert as server cert and another copy of self signed cert  as client cert, server cert having server.com as CN and client cert having localhost as CN, rest all info same
+SSL handshake fails.
+Error message :
+I/O error on GET request for "https://localhost:443/test-https-get": Certificate for doesn't match any of the subject alternative names: []; nested exception is javax.net.ssl.SSLPeerUnverifiedException: Certificate for doesn't match any of the subject alternative names: []
+Resolution : 
+Put localhost either as Common name or as one of SAN in the self-signed certificate
+
+6. A copy of self signed cert as server cert and another copy of self signed cert  as client cert, server cert having localhost as CN, all of subject are different
+SSL handshake passes
+Predictive reason : TrustSelfSignedStrategy implemented, means any server cert which self signed will be trusted. No cert check will be done with client-truststore as reference
+
+7. Expired self signed server cert and client cert
+SSL handshake passes
+Predictive reason : TrustSelfSignedStrategy implemented, means any server cert which self signed will be trusted. No cert check will be done with client-truststore as reference
+===============================================================================
+1. CA signed cert with server.com as common name. Server jks only contains server certificate (not cert chain along with CA). Client contains ca cert ion client jks. Client and server both running on localhost
+SSL handshake fails.
+Error message :
+I/O error on GET request for "https://localhost:443/test-https-get": Certificate for doesn't match any of the subject alternative names: []; nested exception is javax.net.ssl.SSLPeerUnverifiedException: Certificate for doesn't match any of the subject alternative names: []
+Resolution : 
+Put localhost either as Common name or as one of SAN in the self-signed certificate
+
+2. CA signed cert with localhost as common name. Server jks only contains server certificate (not cert chain along with CA). Client contains ca cert ion client jks. Client and server both running on localhost
+SSL handshake passes
+
+3. CA signed cert with localhost as common name. Server jks only contains server certificate (not cert chain along with CA). Client contains server cert ion client jks. Client and server both running on localhost
+SSL handshake passes
+===============================================================================
+1. If server-keystore contains 3-entry cert chain i.e server-cert signed by intermediate-cert and intermediate-cert signed by root cert
+and the client-truststore :
+* contains only server-cert then SSL handshake will PASS (provided all certs in keystore chain have not expired)
+* contains  only intermediate-cert then SSL handshake will PASS (provided all certs in keystore chain have not expired)
+* contains  only root-cert then SSL handshake will FAIL , reason being "not a CA cert". 
+As a resolution we need to make intermediate-cert and root-cert as CA=true under basicConstraints   
+
+2. If server-keystore is non-self signed cert, then if any one of them is expired then SSL handshake will fail. This is the behaviour of X509TrustManager logic
+3. If server-keystore is self signed cert, then even if the cert has been expired teh SSL handshake wil PASS. This is the behaviour of X509TrustManager logic
+
+4. If server-keystore contains 2-entry cert chain i.e server-cert signed by root cert(non-CA)
+and the client-truststore :
+* contains only server-cert then SSL handshake will PASS (provided all certs in keystore chain have not expired)
+* contains  only root-cert then SSL handshake will PASS , (provided all certs in keystore chain have not expired).
+Despite root being non-CA(CA=false in basicConstraints), this handshake will pass as the roor cert is the immediate signer of teh server-cert.
+===============================================================================

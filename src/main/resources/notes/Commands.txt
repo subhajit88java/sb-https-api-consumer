@@ -1,0 +1,111 @@
+1. To create private key : openssl genrsa -out private.key 2048
+2. To extract public key from key pair into a file :  openssl rsa -in private.key -pubout -out public.key
+3. To create a CSR(certificate signing request) : openssl req -new -key private.key -out server.csr
+4. To read the generated CSR :  openssl req -text -in test.csr -noout -verify
+5. To sign the CSR(self-sign) : openssl x509 -in server.csr -out server.crt -req -signkey private.key -days 1
+6. To read the signed cert :  openssl x509 -text -noout -in test.crt 
+7. Both private key and CSR : openssl req -newkey rsa:2048 -keyout domain.key -out domain.csr
+8. Both private key and Self signed certificate : openssl req -newkey rsa:2048 -keyout domain.key -x509 -days 365 -out domain.crt
+=========================================================================
+To sign cert with CA cert :
+1. Create self signed CA cert by using the above mentioned commands
+2. Create configuration text-file (domain.ext) with the following content:
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = www.abcd.com
+3. Use the following command to sign the cer with CA cert :
+openssl x509 -req -CA CA_certificate.crt -CAkey CA_private.key -in domain.csr -out domain_CA.crt -days 365 -CAcreateserial -extfile domain.ext
+=========================================================================
+Convert PEM to DER(used with java) :
+openssl x509 -in domain_CA.crt -outform der -out domain_CA.der
+
+=========================================================================
+Convert PEM to PKCS12(also known as PFX files, are usually used for importing and exporting certificate chains in Microsoft IIS)
+openssl pkcs12 -inkey domain.key -in domain_CA.crt -export -out domain.pfx
+=========================================================================
+
+KEYTOOL :
+
+keytool -genkeypair -alias cert1 -keyalg RSA -keystore keystore1.jks (private key)
+
+keytool -certreq -alias cert1 -file domain.csr -keystore keystore1.jks (csr)
+
+keytool -genkey -alias cert1 -keyalg RSA -validity 365 -keystore keystore.jks
+
+keytool -list -v -keystore keystore.jks
+
+keytool -printcert -file server.crt
+===============================================================================================================
+CREATE CSR alog with PRIVATE KEY:
+export MSYS_NO_PATHCONV=1
+openssl req -newkey rsa:2048 -nodes -subj '/C=GB/ST=London/L=London/O=Barclays PLC/OU=Technology/CN=common-offer.appclc' -keyout common-offer.appcloud.barclays.intranet.key -out common-offer.appcloud.barclays.intranet.csr
+
+VERIFY CSR :
+winpty openssl req -text -in common-offer.appcloud.barclays.intranet.csr -noout -verify
+
+Base64 string to JKS convert :
+openssl base64 -d -A in OLD_TRUSTORE.txt -out OLD_TRUSTORE.jks
+
+READ JKS:
+keytool --list -v --keystore server-truststore.jks
+keytool --list -v --keystore server.jks
+keytool -list -v -keystore keystore.jks | grep -B 5 -i 'Valid from'
+
+DELETE JKS:
+keytool -delete -alias "1" -keystore server.jks
+keytool -delete -alias "interca7" -keystore server-truststore_ca9.jks
+
+P12 CONVERT :
+openssl pkcs12 -export -in perf-apply-core.appcloud-np2.barclays.intranet.crt -inkey perf-apply-core.appcloud-np2.barclays.intranet.key -name perf-apply-core.appcloud-np2.barclays.intranet_2023 -out perf-apply-core.appcloud-np2.barclays.intranet.p12 -passout pass:cobalt
+
+P12 INJECT INTO JKS:
+keytool -importkeystore -srckeystore perf-apply-core.appcloud-np2.barclays.intranet.p12 -srcstoretype pkcs12 -destkeystore server.jks -srcstorepass cobalt -deststoretype jks -deststorepass cobalt
+
+CA9 INJECT :
+keytool -import -trustcacerts -alias interca9 -file intermediate_ca9.crt -keystore test.jks
+
+JKS to p12 CONVERT :
+keytool -importkeystore -srckeystore server_keystore.jks -srcstoretype JKS -deststoretype PKCS12 -destkeystore server_keystore.p12
+
+Extract non encrypted Private KEY from p12:
+winpty openssl pkcs12 -in server keystore.p12 -nodes -nocerts -out server_keystore.key
+
+Convert non-encrypted private key to RSA private key:
+winpty openssl rsa -in testl.key -out test2.key
+
+Convert non-encrypted provate key to Encrypted private key :
+winpty openssl pkey -in server_keystore.key -out server_keystorel.key -des3
+
+Extract .crt from p12:
+openssl pkcs12 -in server_keystore.p12 -nokeys -out server_keystore.crt
+
+Convert jks file to base64 encoded string (on screen) :
+cat aarp-truststore.jks | base64 --wrap=0
+
+Convert jks file to base64 encoded string (on text file) :
+cat server.jks | base64 --wrap=0>prod_new_cert_crsgui.txt
+
+Change jks file password :
+keytool -storepasswd -new [insert new keystore password] -keystore [insert keystore jks file name]
+
+Change p12/private-key password within jks file:
+keytool -keypasswd -alias [insert alias] -new [insert new key password] -keystore [insert keystore file name]
+
+Read PEM file in human readable format :
+cat ca.pem | grep -B 2 -i 'issuer' 
+===============================================================================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
